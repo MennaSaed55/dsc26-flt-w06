@@ -1,3 +1,5 @@
+import 'camera_permission_flow.dart';
+
 /// The camera permission decision logic, kept plain and testable behind
 /// [PermissionGateway] so it never has to touch a real plugin.
 ///
@@ -59,22 +61,60 @@ class CameraPermissionFlow {
 
   /// Called when the user taps the button that starts photo capture.
   Future<PermissionDecision> onCaptureTapped() async {
-    throw UnimplementedError('onCaptureTapped');
+    final currentStatus = await _gateway.status();
+    switch (currentStatus) {
+      case CameraPermissionState.granted:
+      case CameraPermissionState.limited:
+        return const Proceed();
+
+      case CameraPermissionState.restricted:
+        return const Unavailable(canAskAgain: false);
+
+      case CameraPermissionState.permanentlyDenied:
+        return const ShowSettingsHelp();
+
+      case CameraPermissionState.denied:
+        final showRationale = await _gateway.shouldShowRationale();
+
+        if (showRationale) {
+          return const ShowRationale();
+        }
+        final result = await _gateway.request();
+        return _mapRequestResult(result);
+    }
   }
 
   /// Called after the user accepts the app's own rationale card.
   Future<PermissionDecision> onRationaleAccepted() async {
-    throw UnimplementedError('onRationaleAccepted');
+    final result = await _gateway.request();
+    return _mapRequestResult(result);
   }
 
   /// Called when the user dismisses the rationale card without proceeding.
   /// Never touches the gateway.
   Future<PermissionDecision> onRationaleDeclined() async {
-    throw UnimplementedError('onRationaleDeclined');
+    return const Unavailable(canAskAgain: true);
   }
 
   /// The only method that may open the system settings screen.
   Future<bool> onOpenSettingsTapped() {
-    throw UnimplementedError('onOpenSettingsTapped');
+    return _gateway.openSettings();
+  }
+
+  PermissionDecision _mapRequestResult(CameraPermissionState result) {
+    switch (result) {
+      case CameraPermissionState.granted:
+      case CameraPermissionState.limited:
+        return const Proceed();
+
+      case CameraPermissionState.permanentlyDenied:
+        return const ShowSettingsHelp();
+
+      case CameraPermissionState.restricted:
+        return const Unavailable(canAskAgain: false);
+
+      case CameraPermissionState.denied:
+        return const Unavailable(canAskAgain: true);
+    }
   }
 }

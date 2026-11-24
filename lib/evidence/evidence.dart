@@ -4,6 +4,9 @@
 /// TODO(intern): implement sha256Hex and EvidenceRecord.canonicalJson.
 /// GeoPoint is given.
 import 'dart:typed_data';
+import 'dart:convert';
+
+import 'package:crypto/crypto.dart';
 
 import '../capture/capture_angle.dart';
 
@@ -17,7 +20,7 @@ class GeoPoint {
 
 /// The lower-case hex SHA-256 digest of [bytes].
 String sha256Hex(Uint8List bytes) {
-  throw UnimplementedError('sha256Hex');
+  return sha256.convert(bytes).toString();
 }
 
 /// One captured photo plus the facts a surveyor or a regulator needs to
@@ -45,6 +48,23 @@ class EvidenceRecord {
   /// what `jsonEncode` produces, times as UTC ISO-8601, location rounded to
   /// 3 decimal places and omitted entirely without consent or a point.
   String canonicalJson() {
-    throw UnimplementedError('EvidenceRecord.canonicalJson');
+    final data = <String, dynamic>{
+      'angle': angle.name,
+      'appVersion': appVersion,
+      'capturedAt': capturedAt.toUtc().toIso8601String(),
+      'deviceModel': deviceModel,
+    };
+
+    if (locationConsent && location != null) {
+      data['location'] = {
+        'lat': (location!.lat * 1000).round() / 1000,
+        'lng': (location!.lng * 1000).round() / 1000,
+      };
+    }
+
+    data['sha256'] = sha256Hex(bytes);
+    data['sizeBytes'] = bytes.length;
+
+    return jsonEncode(data);
   }
 }
